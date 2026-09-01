@@ -36,13 +36,68 @@ class PublicOAuthClientProvisioner
             return;
         }
 
-        // confidential: false is the whole point — no secret is ever
-        // generated or stored for this client, matching the hard
+        // Different Passport 13.x releases expose different
+        // `ClientRepository` APIs for this — verified live against three
+        // real, differently-versioned installations (a live production
+        // instance, this project's own Docker test server, and this
+        // repo's own composer.json-pinned test harness):
+        //
+        //   - Most releases seen: public
+        //     `createAuthorizationCodeGrantClient(string $name, array
+        //     $redirectUris, bool $confidential = true, ...)` — preferred
+        //     whenever it's public, since its signature has been stable.
+        //   - One older release (no such helper exists yet) has only a
+        //     `create($userId, $name, $redirect, $provider = null,
+        //     $personalAccess = false, $password = false, $confidential =
+        //     true)` method. This is the ONLY shape of `create()` this
+        //     fallback has been verified against live; other Passport
+        //     releases have been observed with entirely different
+        //     `create()` parameter names/order/visibility, so this
+        //     fallback is a best-effort for the one real case seen where
+        //     it's actually needed, not a universal adapter for every
+        //     possible `create()` shape.
+        //
+        // `confidential: false` is the one constant across every path:
+        // no secret is ever generated for this client, matching the hard
         // constraint that no client secret may ever ship inside the app.
-        $this->clients->createAuthorizationCodeGrantClient(
-            name: self::CLIENT_NAME,
-            redirectUris: self::REDIRECT_URIS,
-            confidential: false,
+        $reflection = new \ReflectionClass($this->clients);
+
+        if ($reflection->hasMethod('createAuthorizationCodeGrantClient')) {
+            $method = $reflection->getMethod('createAuthorizationCodeGrantClient');
+            if ($method->isPublic()) {
+                $this->clients->createAuthorizationCodeGrantClient(
+                    name: self::CLIENT_NAME,
+                    redirectUris: self::REDIRECT_URIS,
+                    confidential: false,
+                );
+
+                return;
+            }
+        }
+
+        if ($reflection->hasMethod('create')) {
+            $method = $reflection->getMethod('create');
+            $method->setAccessible(true);
+            // `redirect` on this API shape is always a single string —
+            // `Bridge\Client::__construct()` does `explode(',',
+            // $redirectUri)` on it, never accepts an array.
+            $method->invoke(
+                $this->clients,
+                null,
+                self::CLIENT_NAME,
+                implode(',', self::REDIRECT_URIS),
+                null,
+                false,
+                false,
+                false,
+            );
+
+            return;
+        }
+
+        throw new \RuntimeException(
+            'MobileAPIBridge: installed laravel/passport ClientRepository exposes neither '
+            . 'createAuthorizationCodeGrantClient() nor create() — cannot provision the public OAuth client.'
         );
     }
 

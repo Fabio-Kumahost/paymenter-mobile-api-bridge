@@ -10,6 +10,8 @@ Wird von der nativen iOS-App **PaymenterMobile** benötigt. Ohne diese
 Erweiterung läuft die App nur im eingeschränkten Admin-API-Modus (kein
 Kunden-Login, kein Shop).
 
+Version: 0.1.1 — siehe [CHANGELOG.md](CHANGELOG.md).
+
 ## Voraussetzungen
 
 - Paymenter ≥ 1.5.8 (getestet), PHP 8.5, Laravel Passport (bereits Teil
