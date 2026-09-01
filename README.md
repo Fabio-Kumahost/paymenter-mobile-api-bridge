@@ -52,6 +52,22 @@ Denselben Installationsbefehl erneut ausführen (überschreibt die
 Extension-Dateien), danach im Adminpanel die Erweiterung einmal aus- und
 wieder einschalten, damit ggf. neue Migrationen laufen.
 
+**Wichtig:** Danach den PHP-FPM-Dienst neu starten, damit der PHP-OPcache
+den geänderten Code tatsächlich neu lädt (sonst führt der Server auf
+manchen Setups stillschweigend weiter die alte, im Speicher gecachte
+Version aus, obwohl die Dateien auf der Festplatte bereits aktuell sind
+— live so beobachtet). Der Dienstname hängt von der PHP-Version ab, z. B.:
+
+```bash
+sudo systemctl restart php8.4-fpm
+```
+
+Den tatsächlichen Namen bei Unsicherheit ermitteln mit:
+
+```bash
+systemctl list-units --type=service | grep -i php
+```
+
 ## Sicherheit
 
 - Kein Client-Secret in der mobilen App — der provisionierte OAuth-Client
