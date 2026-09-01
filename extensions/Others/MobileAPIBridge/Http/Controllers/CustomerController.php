@@ -7,9 +7,11 @@ use App\Http\Resources\InvoiceResource;
 use App\Http\Resources\OrderResource;
 use App\Http\Resources\ServiceResource;
 use App\Http\Resources\TicketResource;
+use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Paymenter\Extensions\Others\MobileAPIBridge\Support\PaginationClamp;
+use Paymenter\Extensions\Others\MobileAPIBridge\Support\ServerDetailsResolver;
 
 /**
  * Customer's own resources — every query is scoped to `Auth::id()`
@@ -40,6 +42,47 @@ class CustomerController
             ->paginate(PaginationClamp::perPage($request), page: PaginationClamp::page($request));
 
         return ServiceResource::collection($services);
+    }
+
+    /**
+     * A single service's detail view: the same customer-visible
+     * attributes as the list endpoint, plus its generic per-service
+     * config option values (RAM/CPU/storage/etc — genuinely different
+     * per product, never hardcoded field names), plus an optional
+     * provider-specific `server_details` block (Proxmox IP/hostname/OS
+     * when applicable, null for every other/unknown provider — see
+     * `ServerDetailsResolver`). `findOrFail` on the user's own
+     * `services()` relation, exactly like `invoice()`/`ticket()` above,
+     * so a mismatched id 404s rather than leaking a 403 that would
+     * confirm another customer's service exists.
+     */
+    public function service(Request $request, int $service)
+    {
+        $service = Auth::user()->services()
+            ->with(['product', 'order', 'configs.configOption', 'configs.configValue'])
+            ->findOrFail($service);
+
+        return response()->json([
+            'data' => [
+                'id' => (string) $service->id,
+                'type' => 'services',
+                'attributes' => [
+                    'quantity' => $service->quantity,
+                    'price' => $service->price !== null ? (string) $service->price : null,
+                    'status' => $service->status,
+                    'currency_code' => $service->currency_code,
+                    'expires_at' => $service->expires_at?->toISOString(),
+                    'product_name' => $service->product?->name,
+                ],
+                'configs' => $service->configs->map(function ($config) {
+                    return [
+                        'option_name' => $config->configOption?->name,
+                        'value' => $config->configValue?->name,
+                    ];
+                })->values(),
+                'server_details' => ServerDetailsResolver::resolve($service),
+            ],
+        ]);
     }
 
     public function invoices(Request $request)

@@ -44,6 +44,7 @@ Route::group(['middleware' => ['api', 'auth:api', 'scope:profile', EnsureCustome
 
     Route::get('/orders', [CustomerController::class, 'orders'])->name('mobile.v1.orders');
     Route::get('/services', [CustomerController::class, 'services'])->name('mobile.v1.services');
+    Route::get('/services/{service}', [CustomerController::class, 'service'])->name('mobile.v1.services.show');
     Route::get('/invoices', [CustomerController::class, 'invoices'])->name('mobile.v1.invoices');
     Route::get('/invoices/{invoice}', [CustomerController::class, 'invoice'])->name('mobile.v1.invoices.show');
     Route::get('/credits', [CustomerController::class, 'credits'])->name('mobile.v1.credits');
