@@ -76,8 +76,8 @@ class ServerDetailsResolver
             'provider' => 'proxmox',
             'hostname' => $server->hostname ?? null,
             'status' => $server->status ?? null,
-            'primary_ipv4' => self::resolveIPAddress($server, 'primary_ipv4'),
-            'primary_ipv6' => self::resolveIPAddress($server, 'primary_ipv6'),
+            'primary_ipv4' => self::resolveIPAddress($server, 'primaryIpv4'),
+            'primary_ipv6' => self::resolveIPAddress($server, 'primaryIpv6'),
             'os_name' => self::safeRelationAttribute($server, 'os', 'name'),
             'location_name' => self::safeRelationAttribute($server, 'node', 'name'),
             // Deliberately excluded: `last_password` and any other
@@ -87,9 +87,21 @@ class ServerDetailsResolver
     }
 
     /**
-     * `primary_ipv4`/`primary_ipv6` are relations to an `IPAddress`
-     * model, never plain strings on the server row itself — resolve to
-     * the address string the same way the admin panel would display it.
+     * `primaryIpv4()`/`primaryIpv6()` are the actual Eloquent relation
+     * METHOD names on `...\Proxmox\Models\Server` (belongsTo IPAddress) —
+     * NOT the same as the `primary_ipv4`/`primary_ipv6` snake_case
+     * column names on the same row (those hold the raw foreign-key
+     * integer). Eloquent's magic `__get` only resolves a relation when
+     * the accessed property name exactly matches a defined relation
+     * method; passing the snake_case column name here silently falls
+     * through to plain attribute access instead, returning the raw FK
+     * id (e.g. `488`) rather than the resolved `IPAddress` model — this
+     * was live-reproduced against a real service on pm.kumahost.eu
+     * (`primary_ipv4` attribute value was int `488`, `ipAddresses()`
+     * relation had a real matching row), which made every response
+     * report `primary_ipv4: null` because `resolveIPAddress` couldn't
+     * find `->address`/`->ip`/`->ip_address` on a raw integer. Callers
+     * below therefore pass the correct camelCase relation name.
      */
     private static function resolveIPAddress($server, string $relation): ?string
     {
