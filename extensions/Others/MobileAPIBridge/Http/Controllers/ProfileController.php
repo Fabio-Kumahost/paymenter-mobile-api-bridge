@@ -26,6 +26,7 @@ class ProfileController
 
         return response()->json([
             'data' => [
+                'id' => (string) $user->id,
                 'type' => 'dashboard-summary',
                 'attributes' => [
                     'active_services' => $user->services()->where('status', 'active')->count(),
